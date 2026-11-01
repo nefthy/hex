@@ -2,10 +2,10 @@
 //! stream, VA-API scales and encodes it on the GPU (`crate::linux`), and `ffmpeg` muxes the
 //! movie. Wayland gives an app no global pointer, key state, window list, or synthetic input,
 //! so those answer nothing here: the host (Hex) owns shortcuts and pasting, and the portal's
-//! own picker stands in for the window list. On X11 the screen and an area are read from the
-//! X server itself (`crate::linux::x11`: MIT-SHM, the pointer from XFixes) and encoded with
-//! x264, so desktops without a ScreenCast backend (i3) record too; a window still needs the
-//! portal's picker.
+//! own picker stands in for the window list. Screen and window capture prefer the portal
+//! on every desktop. Without that capability, X11 screens use MIT-SHM and x264 instead.
+//! Explicit X11 areas also use native capture until portal coordinates can be mapped
+//! safely for cropping; a window always needs the portal's picker.
 //!
 //! Frames are pixels; a recording is never upscaled (`MAX_CAPTURE_SCALE`).
 
@@ -265,23 +265,46 @@ pub(super) fn run_sampler(sampler: Sampler) -> Option<super::Movie> {
 }
 
 fn record(sampler: &Sampler) -> Result<Option<super::Movie>> {
-    let source = match sampler.target.mode {
+    route_capture(
+        sampler.target.mode,
+        crate::linux::x11::session(),
+        portal::available,
+        |source| record_portal(sampler, source),
+        || record_x11(sampler),
+    )
+}
+
+/// Keep fallback before consent and stream creation: their failures never widen capture.
+fn route_capture<T>(
+    mode: CaptureMode,
+    x11: bool,
+    available: impl FnOnce(Source) -> Result<bool>,
+    portal: impl FnOnce(Source) -> Result<T>,
+    native: impl FnOnce() -> Result<T>,
+) -> Result<T> {
+    if mode == CaptureMode::Region {
+        if x11 {
+            return native();
+        }
+        bail!("area capture needs a native X11 session; portal area cropping is unavailable");
+    }
+    let source = match mode {
         CaptureMode::Window => Source::Window,
         _ => Source::Screen,
     };
-    let x11 = crate::linux::x11::session();
-    if x11 && source == Source::Screen {
-        return record_x11(sampler);
+    if available(source)? {
+        return portal(source);
     }
-    let portal = pipewire::available().and_then(|()| portal::start(source, &sampler.stopping));
-    let mut cast = match portal {
-        Ok(cast) => cast,
-        // No silent widening to the whole screen: a window on X11 is the portal's to pick.
-        Err(error) if x11 => bail!(
-            "recording a window on X11 needs the desktop's ScreenCast portal ({error:#}); record the screen or an area instead"
-        ),
-        Err(error) => return Err(error),
-    };
+    if x11 && source == Source::Screen {
+        scrawl_log("ScreenCast unavailable; recording through native X11");
+        return native();
+    }
+    bail!("the desktop's ScreenCast portal does not support the requested {source:?} capture");
+}
+
+fn record_portal(sampler: &Sampler, source: Source) -> Result<Option<super::Movie>> {
+    pipewire::available()?;
+    let mut cast = portal::start(source, &sampler.stopping)?;
     let remote = cast
         .remote
         .take()
@@ -415,6 +438,101 @@ fn record(sampler: &Sampler) -> Result<Option<super::Movie>> {
     };
     movie.finish()?;
     Ok(Some(super::Movie::written(path, offset_ms)))
+}
+
+#[cfg(test)]
+mod routing_tests {
+    use super::*;
+
+    #[test]
+    fn portal_is_preferred_on_both_x11_and_wayland() {
+        for x11 in [true, false] {
+            for (mode, expected) in [
+                (CaptureMode::Display, Source::Screen),
+                (CaptureMode::Window, Source::Window),
+            ] {
+                let selected = route_capture(
+                    mode,
+                    x11,
+                    |source| {
+                        assert_eq!(source, expected);
+                        Ok(true)
+                    },
+                    |source| {
+                        assert_eq!(source, expected);
+                        Ok("portal")
+                    },
+                    || panic!("an available portal must take precedence"),
+                )
+                .unwrap();
+                assert_eq!(selected, "portal");
+            }
+        }
+    }
+
+    #[test]
+    fn missing_portal_falls_back_only_for_an_x11_screen() {
+        for x11 in [true, false] {
+            for mode in [CaptureMode::Display, CaptureMode::Window] {
+                let result = route_capture(
+                    mode,
+                    x11,
+                    |_| Ok(false),
+                    |_| panic!("unavailable portal must not start"),
+                    || {
+                        assert!(x11 && mode == CaptureMode::Display);
+                        Ok("native")
+                    },
+                );
+                assert_eq!(result.is_ok(), x11 && mode == CaptureMode::Display);
+            }
+        }
+    }
+
+    #[test]
+    fn portal_failures_never_start_native_capture() {
+        for message in [
+            "cancelled",
+            "denied",
+            "timeout",
+            "stream failed",
+            "PipeWire missing",
+        ] {
+            let result = route_capture::<()>(
+                CaptureMode::Display,
+                true,
+                |_| Ok(true),
+                |_| bail!("{message}"),
+                || panic!("a failed portal must not trigger fallback"),
+            );
+            assert_eq!(result.unwrap_err().to_string(), message);
+        }
+        let result = route_capture::<()>(
+            CaptureMode::Display,
+            true,
+            |_| bail!("bus failed"),
+            |_| panic!("probe failed"),
+            || panic!("probe failure is not unavailability"),
+        );
+        assert_eq!(result.unwrap_err().to_string(), "bus failed");
+    }
+
+    #[test]
+    fn regions_never_widen_to_the_portals_whole_screen() {
+        for x11 in [true, false] {
+            let result = route_capture(
+                CaptureMode::Region,
+                x11,
+                |_| panic!("portal cropping is not implemented"),
+                |_| panic!("must not record the whole screen"),
+                || {
+                    assert!(x11);
+                    Ok("native area")
+                },
+            );
+            assert_eq!(result.is_ok(), x11);
+        }
+    }
 }
 
 /// A screen or area on X11, read from the X server and encoded with x264 (see the module

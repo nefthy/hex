@@ -70,21 +70,34 @@ Draw                                     // capture.draw (capture_host::drawing)
 └── Linux recordings show the overlay itself (Wayland can't leave it out)
 
 On Linux                                 // capture.linux
-├── X11 session (DISPLAY set, WAYLAND_DISPLAY empty; never XWayland) ->
-│   Screen and Area are read from the X server itself (scrawl_capture::
+├── Screen or Window on any Linux desktop -> probe ScreenCast's source types
+│   ├── Requested type available -> portal -> PipeWire, including on X11
+│   ├── Screen unavailable on native X11 -> native screen capture below
+│   └── Window unavailable, or no native fallback -> fail with why
+│   Probe errors, cancellation, denial, timeout and stream failures never
+│   trigger native fallback. A cancelled restored session is not retried.
+│   The backend owns the picker: auto-approving backends may show no dialog.
+│   Checks: capture::platform::routing_tests covers portal preference on both
+│   sessions, unavailable capabilities, failed probes/streams, and region
+│   preservation. These use injected adapters, not a live desktop recording.
+├── Native X11 fallback (DISPLAY set, WAYLAND_DISPLAY empty; never XWayland) ->
+│   Screen is read from the X server itself (scrawl_capture::
 │   linux::x11): MIT-SHM GetImage each frame (plain GetImage without SHM),
 │   the pointer blended in from XFixes, 30 fps to x264 through ffmpeg. No
-│   portal and no dialog, so i3 and other desktops without a ScreenCast
+│   portal and no dialog, so desktops without a ScreenCast
 │   backend record (#690, @nefthy). Screen is the RandR monitor under the
 │   pointer; Area is `hex annotate start --area X,Y,W,H` (pixels), clipped to
-│   the screen. Hex's own overlays show in it. A Window still goes through
+│   the screen. Explicit Area uses this native path even with a portal, since
+│   portal coordinates are not yet mapped for cropping; an area on Wayland
+│   is refused rather than widened to the whole screen.
+│   Hex's own overlays show in it. A Window still goes through
 │   the portal's picker and, without one, fails saying to record the screen
 │   or an area. Can't open the display, an unusual pixel depth, or no
 │   ffmpeg/x264 -> the capture fails at once with why in the capsule, never
 │   a capture without a picture. Check: x11 areas_are_clipped…; a headless
 │   Xvnc + i3 session on apollo with no ScreenCast portal recorded an
 │   800x500 Area (154 frames, 5.1 s) and the 1920x1080 screen (153 frames)
-├── Wayland -> the ScreenCast portal (zbus): Screen asks the desktop once and
+├── Portal path (zbus): Screen asks the desktop once and
 │   keeps its restore token (<support>/screencast-token), so later captures
 │   start without a dialog; Window shows the desktop's picker every time (the
 │   capsule's Window chip goes straight to it); the cursor is embedded

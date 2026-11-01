@@ -30,6 +30,62 @@ const CURSOR_EMBEDDED: u32 = 2;
 /// Kept until the person revokes it.
 const PERSIST_UNTIL_REVOKED: u32 = 2;
 
+/// Probe capabilities before asking for consent. Only a missing portal is unavailable;
+/// a broken bus, access denial, or timeout must not silently select another recorder.
+pub fn available(source: Source) -> Result<bool> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async {
+        tokio::time::timeout(CALL_TIMEOUT, async {
+            let connection = Connection::session().await?;
+            let reply = connection
+                .call_method(
+                    Some(DESKTOP),
+                    DESKTOP_PATH,
+                    Some("org.freedesktop.DBus.Properties"),
+                    "GetAll",
+                    &(SCREEN_CAST,),
+                )
+                .await;
+            let reply = match reply {
+                Ok(reply) => reply,
+                Err(zbus::Error::MethodError(name, _, _))
+                    if matches!(
+                        name.as_str(),
+                        "org.freedesktop.DBus.Error.ServiceUnknown"
+                            | "org.freedesktop.DBus.Error.UnknownObject"
+                            | "org.freedesktop.DBus.Error.UnknownInterface"
+                            // GDBus uses InvalidArgs for GetAll of an absent interface.
+                            // The argument above is a fixed, valid interface name.
+                            | "org.freedesktop.DBus.Error.InvalidArgs"
+                    ) =>
+                {
+                    return Ok(false);
+                }
+                Err(error) => return Err(anyhow!(error)),
+            };
+            let properties: Results = reply.body().deserialize()?;
+            // GetAll is allowed to return an empty map for an absent interface.
+            if properties.is_empty() {
+                return Ok(false);
+            }
+            let types: u32 = properties
+                .get("AvailableSourceTypes")
+                .context("the ScreenCast portal omitted its available source types")?
+                .try_clone()?
+                .try_into()?;
+            let requested = match source {
+                Source::Screen => SOURCE_MONITOR,
+                Source::Window => SOURCE_WINDOW,
+            };
+            Ok(types & requested != 0)
+        })
+        .await
+        .context("the ScreenCast capability probe timed out")?
+    })
+}
+
 /// Where the screen's restore token lives; `None` (the default) keeps none.
 static TOKEN_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 
@@ -180,7 +236,7 @@ impl Portal {
             return match code {
                 0 => Ok(results),
                 1 => bail!("the screen pick was cancelled"),
-                _ => bail!("the screen-cast portal failed {method}"),
+                _ => Err(anyhow!(ResponseFailed(method.to_owned()))),
             };
         }
     }
@@ -189,6 +245,17 @@ impl Portal {
 fn variant<'a>(value: impl Into<Variant<'a>>) -> Variant<'a> {
     value.into()
 }
+
+#[derive(Debug)]
+struct ResponseFailed(String);
+
+impl std::fmt::Display for ResponseFailed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the screen-cast portal failed {}", self.0)
+    }
+}
+
+impl std::error::Error for ResponseFailed {}
 
 /// Asks the desktop for `source` and starts casting it. Blocks while the picker shows, until
 /// `stop` is set.
@@ -201,7 +268,11 @@ pub fn start(source: Source, stop: &AtomicBool) -> Result<Cast> {
         .filter(|token| !token.is_empty());
     match start_with(source, stop, token_file.clone(), restore.clone()) {
         // A revoked or stale choice: forget it and ask again.
-        Err(error) if restore.is_some() && !stop.load(Ordering::Acquire) => {
+        Err(error)
+            if restore.is_some()
+                && error.is::<ResponseFailed>()
+                && !stop.load(Ordering::Acquire) =>
+        {
             crate::log::scrawl_log(format!(
                 "the remembered screen was refused ({error:#}); asking again"
             ));
