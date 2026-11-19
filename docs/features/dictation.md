@@ -256,6 +256,48 @@ and `a_remapped_caps_lock_does_not_hold_a_real_right_control_capture` in
 
 ### Chord Shortcuts
 
+#### Dictate to an app (Linux X11)
+
+In **Settings › Labs › Dictate to an app**, enter one binding per line and
+choose **Save**. Each starts a fresh dictation using the usual hold/toggle
+mode. The destination must already be open with its input ready to paste.
+Use `xprop WM_CLASS` and click the window to find its instance and class.
+For a Vivaldi web app use its **app-specific instance**, not `Vivaldi`;
+the latter can match ordinary browser windows. For example, replace
+`crx_example` with the instance printed on your machine:
+
+```text
+F6 | crx_example
+F7 | crx_example | Ctrl+N
+Ctrl+Alt+M | MyNotes
+```
+
+If Vivaldi gives the app and ordinary windows the same class, use
+`Vivaldi-stable@OpenCode` instead: both the exact class and the title
+fragment must match. Pick a fragment that remains in the web app's title
+when you change sessions.
+
+F6 brings the app forward and pastes into the session it is showing. F7
+first sends Ctrl+N; use the shortcut that actually opens a new session **in
+that same window** in your app. To submit immediately, append `| enter`
+after the preparation key (or write `F6 | crx_example | | enter`).
+Otherwise the result is left for editing. Up to eight bindings; the lab is
+off and the list empty by default.
+
+Hex uses the topmost matching window in X11 stacking order. It cannot
+select a background browser tab or verify that an app handled its own
+shortcut. If activation fails or focus moves to another window, Hex reports
+the failure; **Paste last dictation** recovers the processed text. Sources:
+[`linux/destinations.rs`](../../src/linux/destinations.rs) and
+[`linux/paste/destination.rs`](../../src/linux/paste/destination.rs).
+
+Verified on isolated Xvfb: a title filter distinguishes two windows sharing a
+browser class; an editable binding sends only paste, and a submit binding sends
+the preparation chord, paste, then Return to the editor child. Moving keyboard
+focus away blocks further key presses even before the WM's active-window
+property changes. This does not verify what Vivaldi or a particular web app
+does with its new-session shortcut.
+
 **Added October 29, 2026 (issue 394):** every shortcut (dictation, Voice
 Action, Paste Last, Annotate) is a chord: the set of keys held together, in any
 order and nothing else. A modifier key names its side (left, right, or any);

@@ -142,6 +142,9 @@ impl Feature {
             Self::TypedText => {
                 "Run the focused app's Output steps on the text already typed in the focused field and replace it (typed_text_hotkey)"
             }
+            Self::DestinationShortcuts => {
+                "Dictate into a running app on X11. Each shortcut can send a key before pasting and optionally press Enter afterwards."
+            }
             Self::NotchIndicator => {
                 "On a screen with a notch, the recording indicator grows out of the notch instead of sitting below the menu bar"
             }

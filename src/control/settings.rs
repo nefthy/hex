@@ -333,6 +333,11 @@ pub fn apply(
             }
         }
         "labs.double_tap_modifiers" => candidate.normalize_double_tap_settings(),
+        #[cfg(target_os = "linux")]
+        "labs.destination_bindings" => {
+            crate::linux::destinations::parse(&candidate, &candidate.labs.destination_bindings)
+                .map_err(|error| invalid(name, &error.to_string()))?;
+        }
         "labs.api_browser_origins" => {
             candidate.labs.api_browser_origins =
                 crate::app_settings::normalize_browser_origins(&candidate.labs.api_browser_origins);
@@ -360,6 +365,8 @@ pub fn apply(
                 // Each row of `extra_dictation_hotkeys` is validated from
                 // its own JSON list, not a shortcut key.
                 HotkeySlot::ExtraDictation(_) => None,
+                #[cfg(target_os = "linux")]
+                HotkeySlot::Destination => None,
                 HotkeySlot::TerminalPaste => candidate.terminal_paste_hotkey.as_ref(),
                 HotkeySlot::Cancel => Some(&candidate.cancel_hotkey),
                 HotkeySlot::Screenshot => Some(&candidate.screenshots.hotkey),

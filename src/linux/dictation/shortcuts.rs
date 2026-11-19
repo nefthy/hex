@@ -5,6 +5,17 @@ use super::*;
 /// The shortcuts a listener registers for `settings`.
 pub(super) fn shortcuts(settings: &AppSettings) -> (LinuxHotkey, HotkeyOptions) {
     let options = HotkeyOptions {
+        destinations: if crate::labs::Feature::DestinationShortcuts.on(settings)
+            && crate::labs::Feature::DestinationShortcuts.on_this_os()
+        {
+            crate::linux::destinations::parse(settings, &settings.labs.destination_bindings)
+                .unwrap_or_else(|error| {
+                    tracing::warn!(%error, "invalid destination shortcuts");
+                    Vec::new()
+                })
+        } else {
+            Vec::new()
+        },
         double_tap: settings.double_tap_lock,
         // Double-tap-only needs the double-tap window and a non-modifier key.
         double_tap_only: settings.double_tap_lock

@@ -1280,6 +1280,8 @@ pub enum HotkeySlot {
     SecondDictation,
     /// Labs › More dictation shortcuts (macOS): row `index`'s binding.
     ExtraDictation(usize),
+    #[cfg(target_os = "linux")]
+    Destination,
     /// Labs › Terminal paste shortcut (Windows, Linux).
     TerminalPaste,
     /// Toggle mode's cancel shortcut.

@@ -7,6 +7,8 @@
 //! and is hidden while off.
 
 mod browser_access;
+#[cfg(target_os = "linux")]
+mod destinations;
 mod group;
 #[cfg(all(target_os = "macos", hex_capture))]
 pub(super) mod screenshots;
@@ -212,6 +214,8 @@ pub(super) enum Tab {
 /// What the Labs store shows: its search, tab, and chip.
 #[derive(Default)]
 pub(super) struct Store {
+    #[cfg(target_os = "linux")]
+    pub(super) destinations: TextEdit,
     pub(super) search: TextEdit,
     pub(super) tab: Tab,
     /// The chip selected: only this group's labs show.
@@ -421,6 +425,10 @@ fn open(ui: &mut Ui, tx: &mut Tx) {
     ui.select_pane(Pane::General, tx);
     ui.labs_open = true;
     ui.lab_store = Store::default();
+    #[cfg(target_os = "linux")]
+    {
+        ui.lab_store.destinations = TextEdit::new(ui.settings.labs.destination_bindings.clone());
+    }
     ui.lab_store
         .sync_phrase(&ui.settings.labs.voice_prompt_phrase);
     ui.lab_store
@@ -674,6 +682,9 @@ fn rows(ui: &Ui) -> Vec<Row> {
         rows.push(row(Feature::TapOrHold, Some(&KEYBOARD)));
         rows.push(row(Feature::GnomeClipboardRestore, None));
         rows.push(row(Feature::TypedText, Some(&KEYBOARD)));
+        if !ui.platform.wayland {
+            rows.push(row(Feature::DestinationShortcuts, Some(&KEYBOARD)));
+        }
         rows.push(row(Feature::GnomeMeetingCapsules, None));
         rows.push(row(Feature::GnomeAnnotate, None));
     }
@@ -922,6 +933,7 @@ fn row_key(lab: Lab) -> &'static str {
         Feature::CapsLockDictation => "lab-caps-lock-dictation",
         Feature::GnomeClipboardRestore => "lab-gnome-clipboard-restore",
         Feature::TypedText => "lab-typed-text",
+        Feature::DestinationShortcuts => "lab-destination-shortcuts",
         Feature::NotchIndicator => "lab-notch-indicator",
         Feature::GnomeMeetingCapsules => "lab-gnome-meeting-capsules",
         Feature::GnomeAnnotate => "lab-gnome-annotate",
@@ -975,6 +987,11 @@ fn flip(ui: &mut Ui, lab: Lab) {
     ui.update(|settings| feature.set(settings, on));
     match feature {
         Feature::KeyboardModelSwitching => ui.open = None,
+        #[cfg(target_os = "linux")]
+        Feature::DestinationShortcuts => {
+            ui.lab_store.destinations =
+                TextEdit::new(ui.settings.labs.destination_bindings.clone());
+        }
         // Its selects live only in the Modes pane, and they close with it.
         Feature::AppModelSwitching => ui.open = None,
         // The card's duration menu closes when its lab does.
@@ -1077,6 +1094,8 @@ fn extras(ui: &Ui, p: Paint, entry: &Row, layer: &mut Vec<El>) -> Option<El> {
                 .child(appearance_theme(ui, p)),
         ),
         Lab::Feature(Feature::VoicePrompt) => Some(voice_prompt::body(ui, p)),
+        #[cfg(target_os = "linux")]
+        Lab::Feature(Feature::DestinationShortcuts) => Some(destinations::body(ui, p)),
         Lab::Feature(Feature::StopPhrase) => Some(stop_phrase::body(ui, p)),
         Lab::Feature(Feature::ApiBrowserAccess) => Some(browser_access::body(ui, p)),
         // Wayland reports no file drags, so its card offers the file dialog.

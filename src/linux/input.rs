@@ -303,6 +303,7 @@ impl From<ShortcutCommand> for ListenerCommand {
 /// beside it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct HotkeyOptions {
+    pub(crate) destinations: Vec<crate::linux::destinations::Destination>,
     pub(crate) double_tap: bool,
     /// Only a double-tap starts recording, which then stays locked.
     pub(crate) double_tap_only: bool,
@@ -405,7 +406,7 @@ pub(crate) struct ShortcutKeys(Arc<Mutex<HeldKeys>>);
 #[derive(Debug, Default)]
 struct HeldKeys {
     /// Modifier shortcuts pressed without their release, by [`Shortcut::index`].
-    held: u8,
+    held: u16,
     last: Option<Instant>,
 }
 
@@ -566,14 +567,15 @@ enum Shortcut {
     TerminalPaste,
     /// Labs › Second dictation shortcut.
     SecondDictation,
+    Destination(u8),
 }
 
 // `HeldKeys` keeps one bit per shortcut.
-const _: () = assert!(Shortcut::ALL.len() <= u8::BITS as usize);
+const _: () = assert!(Shortcut::ALL.len() <= u16::BITS as usize);
 
 impl Shortcut {
     /// Every shortcut, in declaration order: `index` is its place here.
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 7 + crate::linux::destinations::LIMIT] = [
         Self::Dictation,
         Self::PasteLast,
         Self::TypedText,
@@ -581,10 +583,21 @@ impl Shortcut {
         Self::RawDictation,
         Self::TerminalPaste,
         Self::SecondDictation,
+        Self::Destination(0),
+        Self::Destination(1),
+        Self::Destination(2),
+        Self::Destination(3),
+        Self::Destination(4),
+        Self::Destination(5),
+        Self::Destination(6),
+        Self::Destination(7),
     ];
 
     fn index(self) -> usize {
-        self as usize
+        Self::ALL
+            .iter()
+            .position(|s| *s == self)
+            .expect("registered shortcut")
     }
 
     /// The dictation flavour a shortcut starts captures with; `None` for
@@ -595,6 +608,7 @@ impl Shortcut {
             Self::RawDictation => Some(DictationFlavour::Raw),
             Self::TerminalPaste => Some(DictationFlavour::TerminalPaste),
             Self::SecondDictation => Some(DictationFlavour::Second),
+            Self::Destination(i) => Some(DictationFlavour::Destination(i)),
             Self::PasteLast | Self::TypedText | Self::Capture => None,
         }
     }
@@ -606,6 +620,7 @@ impl Shortcut {
             DictationFlavour::Raw => Self::RawDictation,
             DictationFlavour::TerminalPaste => Self::TerminalPaste,
             DictationFlavour::Second => Self::SecondDictation,
+            DictationFlavour::Destination(i) => Self::Destination(i),
         }
     }
 
@@ -619,6 +634,7 @@ impl Shortcut {
             Self::RawDictation => ("raw-dictation", "Dictate without processing"),
             Self::TerminalPaste => ("terminal-paste", "Terminal paste shortcut"),
             Self::SecondDictation => ("second-dictation", "Second dictation shortcut"),
+            Self::Destination(_) => unreachable!("destination shortcuts require X11"),
         }
     }
 }
@@ -807,7 +823,8 @@ impl ShortcutState {
                 shortcut @ (Shortcut::Dictation
                 | Shortcut::RawDictation
                 | Shortcut::TerminalPaste
-                | Shortcut::SecondDictation),
+                | Shortcut::SecondDictation
+                | Shortcut::Destination(_)),
             ) => {
                 let Some(flavour) = shortcut.flavour() else {
                     unreachable!("a dictation shortcut has a flavour");
@@ -866,7 +883,8 @@ impl ShortcutState {
                 shortcut @ (Shortcut::Dictation
                 | Shortcut::RawDictation
                 | Shortcut::TerminalPaste
-                | Shortcut::SecondDictation),
+                | Shortcut::SecondDictation
+                | Shortcut::Destination(_)),
             ) => {
                 if shortcut.flavour() != Some(self.flavour) {
                     return None;
@@ -1621,6 +1639,24 @@ mod tests {
             test.events,
             [RAW, Finish, START, Finish, command_raw, Finish]
         );
+    }
+
+    #[test]
+    fn distinct_destination_shortcuts_own_separate_captures() {
+        let mut test = Test::new(true);
+        let first = Shortcut::Destination(0);
+        let second = Shortcut::Destination(7);
+        test.press(first);
+        test.press(second);
+        test.release(second);
+        test.release(first);
+        test.press(second);
+        test.release(second);
+        let start = |i| HotkeyEvent::Start {
+            flavour: DictationFlavour::Destination(i),
+            command: false,
+        };
+        assert_eq!(test.events, [start(0), Finish, start(7), Finish]);
     }
 
     #[test]

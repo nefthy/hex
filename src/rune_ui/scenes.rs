@@ -819,6 +819,18 @@ pub(super) const SCENES: &[Scene] = &[
         ui.settings.labs.typed_text = true;
         ui.labs_open = true;
     }),
+    #[cfg(target_os = "linux")]
+    ("linux-destination-shortcuts", |ui| {
+        *ui = fixture(DesktopShortcuts::Registered);
+        ui.platform.caps = platform::Capabilities::LINUX;
+        ui.platform.wayland = false;
+        ui.labs_open = true;
+        ui.settings.labs.destination_shortcuts = true;
+        ui.settings.labs.destination_bindings = "F6 | Notes\nF7 | Notes | Ctrl+N".into();
+        ui.lab_store.destinations =
+            rune::TextEdit::new(ui.settings.labs.destination_bindings.clone());
+        ui.lab_store.search = rune::TextEdit::new("Dictate to an app");
+    }),
     ("mac-production", |ui| {
         *ui = mac_fixture();
         ui.settings.meetings.enabled = false;

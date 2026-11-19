@@ -173,7 +173,12 @@ impl Backend {
                 .second_dictation
                 .map(|key| (Shortcut::SecondDictation, key)),
         ];
-        for (shortcut, key) in requested.into_iter().flatten() {
+        let destinations = options
+            .destinations
+            .into_iter()
+            .enumerate()
+            .map(|(i, row)| (Shortcut::Destination(i as u8), row.shortcut));
+        for (shortcut, key) in requested.into_iter().flatten().chain(destinations) {
             let mouse = mouse_button(&key.key);
             let code = match mouse {
                 Some(button) => button,

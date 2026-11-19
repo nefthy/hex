@@ -121,6 +121,7 @@ impl Feature {
             | Self::SecondDictationShortcut
             | Self::MoreDictationShortcuts
             | Self::TerminalPasteShortcut
+            | Self::DestinationShortcuts
             | Self::SidedChords
             | Self::TapOrHold
             | Self::DoubleTapModifiers

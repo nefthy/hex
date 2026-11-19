@@ -1272,6 +1272,17 @@ impl AppSettings {
     /// Lab is on, since turning either on can't pull them apart.
     pub fn hotkey_in_use(&self, slot: HotkeySlot, binding: &HotkeyBinding) -> bool {
         let mut others = Vec::new();
+        #[cfg(target_os = "linux")]
+        if slot != HotkeySlot::Destination
+            && self.labs.destination_shortcuts
+            && crate::labs::Feature::DestinationShortcuts.on_this_os()
+            && let Ok(rows) = crate::linux::destinations::read_rows(&self.labs.destination_bindings)
+        {
+            for row in rows {
+                others.push((&row.shortcut).into());
+                others.extend(row.before.as_ref().map(HotkeyBinding::from));
+            }
+        }
         if slot != HotkeySlot::Dictation {
             others.push(self.dictation_hotkey.clone());
         }

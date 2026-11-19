@@ -5,6 +5,9 @@
 /// Columns: Polish, Chinese (Simplified), Japanese, German, Spanish, Ukrainian.
 #[rustfmt::skip]
 pub(super) const TRANSLATIONS: &[(&str, [&str; 6])] = &[
+    ("Dictate to an app", ["Dyktuj do aplikacji", "向应用听写", "アプリに音声入力", "In eine App diktieren", "Dictar en una aplicación", "Диктувати в застосунок"]),
+    ("Choose shortcuts that paste a fresh dictation into a particular app window.", ["Wybierz skróty wklejające nowe dyktowanie do okna wybranej aplikacji.", "选择快捷键，将新听写的文字粘贴到指定应用窗口。", "音声入力した内容を指定したアプリのウィンドウに貼り付けるショートカットを選びます。", "Wähle Tastenkürzel, die ein neues Diktat in ein bestimmtes App-Fenster einfügen.", "Elige atajos para pegar un dictado nuevo en la ventana de una aplicación concreta.", "Виберіть скорочення, що вставляють нову диктовку у вікно певного застосунку."]),
+    ("Shortcut | Window class | Optional key before paste | Optional enter", ["Skrót | Klasa okna | Opcjonalny klawisz przed wklejeniem | Opcjonalne enter", "快捷键 | 窗口类名 | 粘贴前按键（可选） | enter（可选）", "ショートカット | ウィンドウクラス | 貼り付け前のキー（任意） | enter（任意）", "Tastenkürzel | Fensterklasse | Optionale Taste vor dem Einfügen | Optional enter", "Atajo | Clase de ventana | Tecla previa opcional | enter opcional", "Скорочення | Клас вікна | Необов’язкова клавіша перед вставленням | Необов’язкове enter"]),
     ("Live text", ["Tekst na żywo", "实时文字", "ライブテキスト", "Live-Text", "Texto en vivo", "Текст наживо"]),
     ("Failure notices", ["Powiadomienia o błędach", "失败通知", "失敗のお知らせ", "Fehlerhinweise", "Avisos de fallo", "Сповіщення про збої"]),
     ("Stop phrase", ["Fraza stop", "停止短语", "停止フレーズ", "Stopp-Phrase", "Frase de parada", "Фраза зупинки"]),

@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+mod destination;
 use std::io::{ErrorKind, Write};
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
@@ -714,6 +715,7 @@ impl Mime {
 }
 
 struct X11Paster {
+    target: Option<destination::Target>,
     clipboard: Clipboard,
     connection: RustConnection,
     root: u32,
@@ -731,6 +733,7 @@ impl X11Paster {
         let (connection, root, keymap) = connect_x11()?;
         Ok(Self {
             clipboard,
+            target: None,
             connection,
             root,
             control: keymap.keycode(XK_CONTROL_L)?,
@@ -802,6 +805,7 @@ impl X11Paster {
         let result = (|| -> Result<()> {
             for &(type_, key) in sequence {
                 if type_ == KEY_PRESS {
+                    self.check_destination()?;
                     // A failed call may still reach the server, so release it too.
                     pressed.push(key);
                 }

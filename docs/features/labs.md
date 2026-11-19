@@ -89,6 +89,7 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 ├── Copy dictation only no labs.copy_only (macOS, Windows)    a dictation goes to the clipboard and is never pasted; Paste last dictation still pastes (#629)
 ├── YOLO mode no labs.yolo_mode (every OS) press Return after pasting a shortcut dictation in a chosen app (none chosen = everywhere); Escape after release skips Return on macOS
 ├── Return to app   no    labs.return_to_app           (macOS)   a dictation pastes into the app it started in, switching back to it first when another app came forward
+├── Dictate to an app no  labs.destination_shortcuts   (Linux X11)  up to eight destination bindings, edited on the lab card; see Dictation › Dictate to an app
 ├── Dictation for a command no labs.print_start        (macOS)   hex dictation start --print answers with the transcript however the recording ends; never pasted or copied
 ├── Rewrite by voice    no    labs.voice_prompt + labs.voice_prompt_phrase ("rewrite this", every OS)
 │                                        a spoken phrase inside a dictation hands the mode's OpenCode model a one-off

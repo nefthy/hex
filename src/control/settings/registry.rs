@@ -695,6 +695,16 @@ pub(super) const KEYS: &[Key] = &[
          \"rewrite this\" by default",
     ),
     key(
+        "labs.destination_shortcuts",
+        Kind::Bool,
+        "Enable shortcuts that dictate to an application window on Linux X11",
+    ),
+    key(
+        "labs.destination_bindings",
+        Kind::Text,
+        "One X11 destination per line: shortcut | WM_CLASS | optional preparation shortcut | optional enter",
+    ),
+    key(
         "labs.stop_phrase",
         Kind::Bool,
         "Labs: a spoken phrase at the end of a hands-free dictation finishes it, as if the \

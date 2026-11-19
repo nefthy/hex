@@ -876,6 +876,17 @@
       ],
       "summary": "Drop a WAV, MP3, AAC, M4A, MP4, MOV, AIFF, CAF, FLAC, OGG, Opus, WebM, or MKV file on the Hex window to save its transcript as a text file next to it",
       "title": "Transcribe dropped audio"
+    },
+    {
+      "added": "2026-11-19",
+      "group": "shortcuts",
+      "groupTitle": "Shortcuts",
+      "id": "destination-shortcuts",
+      "oses": [
+        "linux"
+      ],
+      "summary": "Choose shortcuts that paste a fresh dictation into a particular app window.",
+      "title": "Dictate to an app"
     }
   ]
 }

@@ -62,6 +62,7 @@ impl Feature {
             | Self::HideMenuBarIcon
             | Self::GnomeClipboardRestore
             | Self::TypedText
+            | Self::DestinationShortcuts
             | Self::GnomeMeetingCapsules
             | Self::Screenshots
             | Self::AnnotateReplay
@@ -164,6 +165,7 @@ impl Feature {
             Self::CopyDictationAudio | Self::MicrophoneKeyAlone => 20261115,
             Self::StopPhrase | Self::HoldThroughKeys => 20261116,
             Self::ModesEditor => 20261118,
+            Self::DestinationShortcuts => 20261119,
             Self::CalendarSelectAll => 20261118,
         }
     }
@@ -206,6 +208,9 @@ impl Feature {
         if key == "labs.api_browser_origins" {
             return Some(Self::ApiBrowserAccess);
         }
+        if key == "labs.destination_bindings" {
+            return Some(Self::DestinationShortcuts);
+        }
         if key == "capture.replay_hotkey" {
             return Some(Self::AnnotateReplay);
         }
@@ -219,6 +224,16 @@ impl Feature {
     pub fn on_this_os(self) -> bool {
         match self {
             Self::KeyboardModelSwitching => crate::keyboard_input_sources::available(),
+            Self::DestinationShortcuts => {
+                #[cfg(target_os = "linux")]
+                {
+                    !crate::linux::session::LinuxSession::detect().is_wayland()
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    false
+                }
+            }
             Self::AnnotateReplay => {
                 #[cfg(hex_capture)]
                 {
@@ -250,6 +265,7 @@ impl Feature {
             Self::SectionKeyAlone => MACOS_LINUX,
             Self::MicrophoneKeyAlone => MACOS,
             Self::GnomeClipboardRestore
+            | Self::DestinationShortcuts
             | Self::TypedText
             | Self::GnomeMeetingCapsules
             | Self::GnomeAnnotate
@@ -374,6 +390,7 @@ impl Feature {
             Self::HideMenuBarIcon => "hide-menu-bar-icon",
             Self::GnomeClipboardRestore => "gnome-clipboard-restore",
             Self::TypedText => "typed-text",
+            Self::DestinationShortcuts => "destination-shortcuts",
             Self::NotchIndicator => "notch-indicator",
             Self::GnomeMeetingCapsules => "gnome-meeting-capsules",
             Self::GnomeAnnotate => "gnome-annotate",
@@ -458,6 +475,7 @@ impl Feature {
             Self::HideMenuBarIcon => "labs.hide_menu_bar_icon",
             Self::GnomeClipboardRestore => "labs.gnome_clipboard_restore",
             Self::TypedText => "labs.typed_text",
+            Self::DestinationShortcuts => "labs.destination_shortcuts",
             Self::NotchIndicator => "labs.notch_indicator",
             Self::GnomeMeetingCapsules => "labs.gnome_meeting_capsules",
             Self::GnomeAnnotate => "labs.gnome_annotate",

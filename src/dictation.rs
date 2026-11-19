@@ -83,6 +83,8 @@ pub enum DictationFlavour {
     /// like the dictation shortcut. It is its own owner, so neither
     /// shortcut finishes or double-taps the other's capture.
     Second,
+    #[cfg(target_os = "linux")]
+    Destination(u8),
 }
 
 #[cfg_attr(not(any(target_os = "windows", target_os = "linux")), allow(dead_code))]

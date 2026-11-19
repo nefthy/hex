@@ -42,6 +42,7 @@ use silence::reopen_silent_stream;
 use typing::CaptureTyping;
 
 struct Job {
+    destination: Option<crate::linux::destinations::Destination>,
     transcript: PendingTranscript,
     context: crate::linux::context::PendingContext,
     audio_ms: u64,
@@ -350,13 +351,21 @@ pub(crate) fn run(
                         job.by_shortcut,
                     );
                 }
-                let paster = paster.as_mut().map_err(|error| eyre!("{error:#}"))?;
                 let mut paste = |text: &str, terminal: bool, send: bool| {
+                    let paster = paster.as_mut().map_err(|error| eyre!("{error:#}"))?;
+                    if let crate::dictation::DictationFlavour::Destination(_) = job.flavour {
+                        let dest = job
+                            .destination
+                            .as_ref()
+                            .ok_or_else(|| eyre!("Destination shortcut is no longer available"))?;
+                        paster.deliver_to(dest, text)?;
+                        return Ok(dest.submit);
+                    }
                     paster.paste(text, terminal)?;
                     if send {
                         paster.press_return()?;
                     }
-                    Ok(())
+                    Ok(send)
                 };
                 output_settings.deliver(
                     text,
@@ -456,6 +465,7 @@ pub(crate) fn run(
     // The flavour of the shortcut that started the recording (Dictate
     // without processing, or Labs › Terminal paste).
     let mut recording_flavour = crate::dictation::DictationFlavour::Normal;
+    let mut destination = None;
     let mut recording_by_shortcut = false;
     // Labs › Stop phrase: this capture's detector, fresh for every capture.
     let mut stop_phrase = crate::dictation::stop_phrase::Detector::new();
@@ -674,6 +684,7 @@ pub(crate) fn run(
                 &mut active_typing,
                 context,
                 stop_phrase,
+                destination.take(),
             )?;
             if silent
                 && reopen_silent_stream(
@@ -808,6 +819,12 @@ pub(crate) fn run(
                         input.retry_now();
                     }
                     recording_flavour = flavour;
+                    destination = match flavour {
+                        crate::dictation::DictationFlavour::Destination(i) => {
+                            running.1.destinations.get(i as usize).cloned()
+                        }
+                        _ => None,
+                    };
                     recording_by_shortcut = !command;
                     // Labs › Stop phrase: a new capture listens for the phrase
                     // from its own words.
@@ -1352,6 +1369,7 @@ fn submit_capture(
     typing: &mut Option<CaptureTyping>,
     context: crate::linux::context::PendingContext,
     stop_phrase: Option<String>,
+    destination: Option<crate::linux::destinations::Destination>,
 ) -> Result<bool> {
     // A discarded capture drops this guard without starting or ending a
     // session; a transcribed one moves it into the job.
@@ -1384,6 +1402,7 @@ fn submit_capture(
                 .language;
             let recording = crate::history::Recording::keep(&samples);
             let job = OutputJob::Dictation(Box::new(Job {
+                destination,
                 transcript: engine.finish(stream, samples)?,
                 context,
                 audio_ms,
@@ -1630,6 +1649,7 @@ mod tests {
             &mut None,
             Default::default(),
             None,
+            None,
         )
         .unwrap();
         assert!(silent);
@@ -1782,6 +1802,7 @@ mod tests {
             &mut None,
             Default::default(),
             None,
+            None,
         )
         .unwrap();
         assert_eq!(pending, 1);
@@ -1854,6 +1875,7 @@ mod tests {
             &mut None,
             Default::default(),
             None,
+            None,
         )
         .unwrap();
 
@@ -1891,6 +1913,7 @@ mod tests {
             false,
             &mut None,
             Default::default(),
+            None,
             None,
         )
         .unwrap();
@@ -1981,7 +2004,7 @@ mod tests {
         let text = "the dictation whose paste failed";
         let output = DictationOutput::from_settings(&AppSettings::default(), None);
         let mut last_dictation = Some("an older dictation".to_string());
-        let mut paste = |_: &str, _: bool, _: bool| -> Result<()> {
+        let mut paste = |_: &str, _: bool, _: bool| -> Result<bool> {
             Err(eyre!("clipboard changed while Hex was preserving it"))
         };
 

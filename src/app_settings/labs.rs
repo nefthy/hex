@@ -175,6 +175,8 @@ pub struct LabsSettings {
     /// A shortcut runs the focused app's Output steps on the text already
     /// typed there and replaces it (`typed_text_hotkey`, unbound by default).
     pub typed_text: bool,
+    pub destination_shortcuts: bool,
+    pub destination_bindings: String,
     /// At either visible indicator position, the HUD grows out of the notch on a screen with one (macOS).
     pub notch_indicator: bool,
     /// The meeting capsules float on a running XWayland on Wayland desktops without layer-shell, such as GNOME (Linux, issue 1274).
@@ -414,6 +416,8 @@ impl Default for LabsSettings {
             appearance_theme: AppearanceTheme::System,
             gnome_clipboard_restore: false,
             typed_text: false,
+            destination_shortcuts: false,
+            destination_bindings: String::new(),
             notch_indicator: false,
             annotate_replay: false,
             opencode_in_wsl: false,

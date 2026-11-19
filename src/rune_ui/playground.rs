@@ -297,6 +297,11 @@ const PATHS: &[(&str, &str)] = &[
     ("windows-settings", "Linux & Windows/Settings · Windows"),
     ("windows-labs", "Linux & Windows/Labs · Windows"),
     ("linux-labs", "Linux & Windows/Labs · Linux"),
+    #[cfg(target_os = "linux")]
+    (
+        "linux-destination-shortcuts",
+        "Linux & Windows/Dictate to an app",
+    ),
     ("disabled", "Linux & Windows/Disabled"),
     ("capturing", "Linux & Windows/Recording a shortcut"),
     ("menus", "Linux & Windows/Microphone menu"),

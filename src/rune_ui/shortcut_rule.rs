@@ -37,6 +37,8 @@ pub(crate) fn shortcut_rule(slot: HotkeySlot, binding: &HotkeyBinding) -> Result
         // dictation shortcut's rules everywhere else, including macOS, where
         // it is never registered.
         HotkeySlot::TypedText => ShortcutTarget::Dictation,
+        #[cfg(target_os = "linux")]
+        HotkeySlot::Destination => ShortcutTarget::Dictation,
         // Screenshots are macOS-only; elsewhere a saved one meets the
         // dictation shortcut's rules.
         #[cfg(not(target_os = "macos"))]

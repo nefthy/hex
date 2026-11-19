@@ -20,7 +20,7 @@ pub(crate) struct DictationOutput {
 /// How a finished dictation is pasted: its text, whether it asks for
 /// Ctrl+Shift+V, and whether Return follows (Labs › YOLO mode).
 /// No paste at all means a printing stop.
-pub(super) type Paste<'a> = &'a mut dyn FnMut(&str, bool, bool) -> Result<()>;
+pub(super) type Paste<'a> = &'a mut dyn FnMut(&str, bool, bool) -> Result<bool>;
 
 impl DictationOutput {
     pub(crate) fn from_settings(
@@ -119,9 +119,8 @@ impl DictationOutput {
             // Hex saved it, or a format couldn't be read) keeps the text
             // for Paste last dictation, so the dictation isn't lost;
             // History keeps only pasted output.
-            paste(&processed.text, flavour.terminal_paste(), send)
+            sent = paste(&processed.text, flavour.terminal_paste(), send)
                 .inspect_err(|_| *last_dictation = Some(processed.text.clone()))?;
-            sent = send;
         }
         if !printed {
             *last_dictation = Some(processed.text.clone());
