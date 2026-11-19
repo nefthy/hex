@@ -45,146 +45,6 @@ impl LinuxPaster {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use x11rb::protocol::xproto::{CreateWindowAux, InputFocus, PropMode, WindowClass};
-    use x11rb::wrapper::ConnectionExt as _;
-
-    /// Run only on a private Xvfb. Three windows: two browser instances
-    /// share a class; one app's child owns keyboard focus. A subsequent
-    /// focus change must disarm even an optional Return.
-    #[test]
-    #[ignore = "needs an isolated X11 display"]
-    fn destination_matches_browser_instance_and_rechecks_actual_focus() {
-        let mut x = X11Paster::new().unwrap();
-        let c = &x.connection;
-        let make = |parent| {
-            let id = c.generate_id().unwrap();
-            c.create_window(
-                0,
-                id,
-                parent,
-                0,
-                0,
-                100,
-                100,
-                0,
-                WindowClass::INPUT_OUTPUT,
-                0,
-                &CreateWindowAux::new().event_mask(EventMask::KEY_PRESS),
-            )
-            .unwrap()
-            .check()
-            .unwrap();
-            c.map_window(id).unwrap().check().unwrap();
-            id
-        };
-        let app = make(x.root);
-        let other = make(x.root);
-        let editor = make(app);
-        for (id, class) in [
-            (app, &b"crx_example\0Browser\0"[..]),
-            (other, b"browser\0Browser\0"),
-        ] {
-            c.change_property8(
-                PropMode::REPLACE,
-                id,
-                AtomEnum::WM_CLASS,
-                AtomEnum::STRING,
-                class,
-            )
-            .unwrap()
-            .check()
-            .unwrap();
-        }
-        let stack = x.atom(b"_NET_CLIENT_LIST_STACKING").unwrap();
-        c.change_property32(
-            PropMode::REPLACE,
-            x.root,
-            stack,
-            AtomEnum::WINDOW,
-            &[app, other],
-        )
-        .unwrap()
-        .check()
-        .unwrap();
-        assert_eq!(x.find_window("crx_example", None).unwrap(), app);
-        assert!(x.find_window("absent", None).is_err());
-        let title = x.atom(b"_NET_WM_NAME").unwrap();
-        let utf8 = x.atom(b"UTF8_STRING").unwrap();
-        c.change_property8(
-            PropMode::REPLACE,
-            app,
-            title,
-            utf8,
-            b"My session - OpenCode",
-        )
-        .unwrap()
-        .check()
-        .unwrap();
-        assert_eq!(x.find_window("browser", Some("opencode")).unwrap(), app);
-        assert!(x.find_window("browser", Some("other site")).is_err());
-        let active = x.atom(b"_NET_ACTIVE_WINDOW").unwrap();
-        c.change_property32(PropMode::REPLACE, x.root, active, AtomEnum::WINDOW, &[app])
-            .unwrap()
-            .check()
-            .unwrap();
-        c.set_input_focus(InputFocus::PARENT, editor, 0u32)
-            .unwrap()
-            .check()
-            .unwrap();
-        let mut paster =
-            LinuxPaster::new(Default::default(), Default::default(), Default::default()).unwrap();
-        let mut routes = crate::linux::destinations::parse(
-            &Default::default(),
-            "F6 | Browser@OpenCode\nF7 | crx_example | Ctrl+N | enter",
-        )
-        .unwrap();
-        let received = || {
-            c.get_input_focus().unwrap().reply().unwrap();
-            let mut keys = Vec::new();
-            while let Some(event) = c.poll_for_event().unwrap() {
-                if let x11rb::protocol::Event::KeyPress(key) = event {
-                    assert_eq!(key.event, editor);
-                    keys.push(key.detail);
-                }
-            }
-            keys
-        };
-        paster
-            .deliver_to(&routes.remove(0), "editable draft")
-            .unwrap();
-        assert_eq!(received(), [x.control, x.v]);
-        paster.deliver_to(&routes[0], "new session").unwrap();
-        assert_eq!(
-            received(),
-            [
-                x.control,
-                x.keymap.keycode(b'n' as u32).unwrap(),
-                x.control,
-                x.v,
-                x.keymap.keycode(XK_RETURN).unwrap()
-            ]
-        );
-        x.target = Some(Target {
-            active,
-            window: app,
-            title: Some("opencode".into()),
-        });
-        assert!(x.check_destination().is_ok());
-        c.set_input_focus(InputFocus::PARENT, other, 0u32)
-            .unwrap()
-            .check()
-            .unwrap();
-        let enter = x.keymap.keycode(XK_RETURN).unwrap();
-        assert!(
-            x.send_keys(&[(KEY_PRESS, enter), (KEY_RELEASE, enter)])
-                .is_err()
-        );
-    }
-}
-
 pub(super) struct Target {
     active: u32,
     window: Window,
@@ -347,5 +207,145 @@ impl X11Paster {
             .chain(codes.iter().rev().map(|&k| (KEY_RELEASE, k)))
             .collect::<Vec<_>>();
         self.send_keys(&sequence)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use x11rb::protocol::xproto::{CreateWindowAux, InputFocus, PropMode, WindowClass};
+    use x11rb::wrapper::ConnectionExt as _;
+
+    /// Run only on a private Xvfb. Three windows: two browser instances
+    /// share a class; one app's child owns keyboard focus. A subsequent
+    /// focus change must disarm even an optional Return.
+    #[test]
+    #[ignore = "needs an isolated X11 display"]
+    fn destination_matches_browser_instance_and_rechecks_actual_focus() {
+        let mut x = X11Paster::new().unwrap();
+        let c = &x.connection;
+        let make = |parent| {
+            let id = c.generate_id().unwrap();
+            c.create_window(
+                0,
+                id,
+                parent,
+                0,
+                0,
+                100,
+                100,
+                0,
+                WindowClass::INPUT_OUTPUT,
+                0,
+                &CreateWindowAux::new().event_mask(EventMask::KEY_PRESS),
+            )
+            .unwrap()
+            .check()
+            .unwrap();
+            c.map_window(id).unwrap().check().unwrap();
+            id
+        };
+        let app = make(x.root);
+        let other = make(x.root);
+        let editor = make(app);
+        for (id, class) in [
+            (app, &b"crx_example\0Browser\0"[..]),
+            (other, b"browser\0Browser\0"),
+        ] {
+            c.change_property8(
+                PropMode::REPLACE,
+                id,
+                AtomEnum::WM_CLASS,
+                AtomEnum::STRING,
+                class,
+            )
+            .unwrap()
+            .check()
+            .unwrap();
+        }
+        let stack = x.atom(b"_NET_CLIENT_LIST_STACKING").unwrap();
+        c.change_property32(
+            PropMode::REPLACE,
+            x.root,
+            stack,
+            AtomEnum::WINDOW,
+            &[app, other],
+        )
+        .unwrap()
+        .check()
+        .unwrap();
+        assert_eq!(x.find_window("crx_example", None).unwrap(), app);
+        assert!(x.find_window("absent", None).is_err());
+        let title = x.atom(b"_NET_WM_NAME").unwrap();
+        let utf8 = x.atom(b"UTF8_STRING").unwrap();
+        c.change_property8(
+            PropMode::REPLACE,
+            app,
+            title,
+            utf8,
+            b"My session - OpenCode",
+        )
+        .unwrap()
+        .check()
+        .unwrap();
+        assert_eq!(x.find_window("browser", Some("opencode")).unwrap(), app);
+        assert!(x.find_window("browser", Some("other site")).is_err());
+        let active = x.atom(b"_NET_ACTIVE_WINDOW").unwrap();
+        c.change_property32(PropMode::REPLACE, x.root, active, AtomEnum::WINDOW, &[app])
+            .unwrap()
+            .check()
+            .unwrap();
+        c.set_input_focus(InputFocus::PARENT, editor, 0u32)
+            .unwrap()
+            .check()
+            .unwrap();
+        let mut paster =
+            LinuxPaster::new(Default::default(), Default::default(), Default::default()).unwrap();
+        let mut routes = crate::linux::destinations::parse(
+            &Default::default(),
+            "F6 | Browser@OpenCode\nF7 | crx_example | Ctrl+N | enter",
+        )
+        .unwrap();
+        let received = || {
+            c.get_input_focus().unwrap().reply().unwrap();
+            let mut keys = Vec::new();
+            while let Some(event) = c.poll_for_event().unwrap() {
+                if let x11rb::protocol::Event::KeyPress(key) = event {
+                    assert_eq!(key.event, editor);
+                    keys.push(key.detail);
+                }
+            }
+            keys
+        };
+        paster
+            .deliver_to(&routes.remove(0), "editable draft")
+            .unwrap();
+        assert_eq!(received(), [x.control, x.v]);
+        paster.deliver_to(&routes[0], "new session").unwrap();
+        assert_eq!(
+            received(),
+            [
+                x.control,
+                x.keymap.keycode(b'n' as u32).unwrap(),
+                x.control,
+                x.v,
+                x.keymap.keycode(XK_RETURN).unwrap()
+            ]
+        );
+        x.target = Some(Target {
+            active,
+            window: app,
+            title: Some("opencode".into()),
+        });
+        assert!(x.check_destination().is_ok());
+        c.set_input_focus(InputFocus::PARENT, other, 0u32)
+            .unwrap()
+            .check()
+            .unwrap();
+        let enter = x.keymap.keycode(XK_RETURN).unwrap();
+        assert!(
+            x.send_keys(&[(KEY_PRESS, enter), (KEY_RELEASE, enter)])
+                .is_err()
+        );
     }
 }
