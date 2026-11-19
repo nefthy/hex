@@ -23,13 +23,6 @@ fn main() {
         println!("cargo::rustc-cfg=hex_capture");
     }
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
-        if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
-            // transcribe-cpp's static manifest records OpenBLAS as an absolute
-            // link argument, which Cargo does not propagate through the -sys
-            // crate to this final binary. Keep it after the static archives so
-            // GNU ld's --as-needed does not discard it before seeing cblas_*.
-            println!("cargo:rustc-link-arg=-lopenblas");
-        }
         if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
             // transcribe-cpp's Vulkan backend links the vulkan-1 import
             // library by name without its search path. The DLL itself ships

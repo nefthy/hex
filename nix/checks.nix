@@ -69,11 +69,7 @@ in
   '';
 
   shell-environment =
-    assert lib.all (name: shell.${name} == hex.${name}) [
-      "BLA_VENDOR"
-      "OPENSSL_NO_VENDOR"
-    ];
-    # OpenBLAS ordering belongs to build.rs, not an injected Nix-only workaround.
+    assert shell.OPENSSL_NO_VENDOR == hex.OPENSSL_NO_VENDOR;
     assert !(hex ? RUSTFLAGS) && !(shell ? RUSTFLAGS);
     assert lib.all
       (package: builtins.elem "${lib.getLib package}/lib" (lib.splitString ":" shell.LD_LIBRARY_PATH))

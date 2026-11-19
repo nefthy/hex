@@ -1712,7 +1712,7 @@ native build dependencies with:
 
 ```sh
 sudo pacman -S --needed base-devel git rustup python alsa-lib curl jq openssl xxd \
-  util-linux libxkbcommon libxkbcommon-x11 libx11 libxcb openblas \
+  util-linux libxkbcommon libxkbcommon-x11 libx11 libxcb \
   vulkan-headers vulkan-icd-loader \
   shaderc spirv-headers clang cmake pkgconf wl-clipboard wtype
 rustup default stable

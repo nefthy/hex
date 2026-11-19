@@ -200,8 +200,7 @@ cargo run --locked -- app
 ```
 
 The package and shell share the native build environment and runtime
-library/plugin paths. OpenBLAS link ordering is handled by `build.rs`, not
-by Nix-only `RUSTFLAGS`. The shell also supplies the paste and download
+library/plugin paths. The shell also supplies the paste and download
 helpers, so it does not rely on the installed app's wrapper. Desktop commands
 still require a real graphical/audio session and the permissions described above.
 

@@ -8,7 +8,6 @@
   vulkan-headers,
   vulkan-loader,
   spirv-headers,
-  openblas,
   alsa-lib,
   alsa-plugins,
   pipewire,
@@ -40,12 +39,10 @@
 let
   buildEnv = {
     OPENSSL_NO_VENDOR = "1";
-    BLA_VENDOR = "OpenBLAS";
   };
   runtimeEnv = {
     LD_LIBRARY_PATH = lib.makeLibraryPath [
       vulkan-loader
-      openblas
       alsa-lib
       wayland
       libxkbcommon
@@ -225,7 +222,6 @@ rustPlatform.buildRustPackage (finalAttrs: {
     vulkan-headers
     vulkan-loader
     spirv-headers
-    openblas
     alsa-lib
     openssl
     libxkbcommon

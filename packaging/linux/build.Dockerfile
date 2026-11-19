@@ -12,7 +12,7 @@ FROM debian:12@sha256:d74df7598108a173a621eda4d58a2adbf850b2d9a9d81bc2cca1a6c211
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates clang cmake curl file git jq libasound2-dev libfontconfig1-dev \
-    libfreetype-dev libopenblas-dev libssl-dev libvulkan-dev libx11-xcb-dev \
+    libfreetype-dev libssl-dev libvulkan-dev libx11-xcb-dev \
     libxcursor-dev libxi-dev libxkbcommon-x11-dev libxrandr-dev make ninja-build \
     openssl pkg-config python3 \
   && rm -rf /var/lib/apt/lists/*
